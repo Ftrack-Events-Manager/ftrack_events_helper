@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 @author: LiaoKong
-@time: 2021/08/27 22:30 
+@time: 2021/08/28 22:01 
 """
 import sys
 import ctypes
@@ -9,9 +9,9 @@ import traceback
 from functools import wraps
 from datetime import datetime
 
-from utils.mongo import Mongo
+from mongo import Mongo
 from config import DB_LOG_CONFIG
-from handler import LogFormatter, get_group_name
+from handler import LogFormatter, get_group_name, load_session, load_events
 
 
 def subscribe(topic='ftrack.update', subscriber=None, priority=100):
@@ -22,10 +22,9 @@ def subscribe(topic='ftrack.update', subscriber=None, priority=100):
         def my_event(event):
             pass
     Args:
-        topic: 订阅的项，eg: 'my_event_topic'
+        topic: 订阅的项
         subscriber: 订阅的信息
         priority: 优先级 (这个值为初始优先级，会被网站上的事件优先级值覆盖)
-
     """
 
     def wrapper(func):
@@ -127,3 +126,37 @@ class Log(object):
     @classmethod
     def _reset_cmd_color(cls):
         cls._set_cmd_text_color(0x0c | 0x0a | 0x09)
+
+
+class EventBase(Log):
+    """
+        如果事件想写成类，可以继承这个类
+        run函数为event的入口函数，需要在run函数处理事件
+        在类里面可以直接调用self.info/self.error/self.warning/self.exception来记录log
+    """
+
+    def __init__(self, session):
+        self.session = session
+
+    def run(self, event):
+        raise NotImplementedError
+
+    @classmethod
+    def _record(cls, msg, log_type, group=None, event=None, **kwargs):
+        return super(EventBase, cls)._record(
+            msg, log_type, group, cls.__name__,
+            traceback.extract_stack()[-3], **kwargs
+        )
+
+
+def run_test_server(debug=False):
+    """
+    用于直接测试当前文件中的事件
+    Args:
+        debug: 是否只接受debug账号发送过来的消息
+    """
+    session = load_session(debug)
+    file_path = traceback.extract_stack()[0][0].replace('\\', '/')
+    load_events(session, file_path, debug)
+
+    session.event_hub.wait()

@@ -3,11 +3,9 @@
 @author: LiaoKong
 @time: 2021/08/26 22:00
 """
-
 import pymongo
 
-_HOST = '127.0.0.1'
-_POST = 27017
+from config import DB_CONFIG
 
 
 class Mongo(object):
@@ -15,7 +13,7 @@ class Mongo(object):
     DOWN = pymongo.DESCENDING
 
     def __init__(self, database_name, collection_name):
-        self.connect = pymongo.MongoClient(_HOST, _POST)
+        self.connect = pymongo.MongoClient(**DB_CONFIG)
         self.database = self.connect[database_name]
         self.collection = self.database[collection_name]
         self._query_data = None

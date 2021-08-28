@@ -24,7 +24,7 @@ def subscribe(topic='ftrack.update', subscriber=None, priority=100):
     Args:
         topic: 订阅的项
         subscriber: 订阅的信息
-        priority: 优先级 (这个值为初始优先级，会被网站上的事件优先级值覆盖)
+        priority: 优先级 (这个值为初始优先级，会被网站上的事件优先级值覆盖，这里加这个参数是为了方便几个事件间的调试)
     """
 
     def wrapper(func):

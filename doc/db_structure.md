@@ -25,7 +25,7 @@
     "path": "事件文件路径",
     "id": "uuid",
     "priority": 100,  // 事件优先级
-    "enable": true  // 事件是否被启用
+    "enabled": true  // 事件是否被启用
   },
   // 事件组类型
   {
@@ -40,7 +40,7 @@
         "path": "事件文件路径",
         "id": "uuid",
         "priority": 100,
-        "enable": true
+        "enabled": true
       },
     ] 
   }

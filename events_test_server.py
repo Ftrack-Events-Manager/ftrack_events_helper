@@ -3,19 +3,10 @@
 @author: LiaoKong
 @time: 2021/08/29 17:42 
 """
-import os
-
-from ftrack_events_helper.config import EVENTS_ROOTS
 from ftrack_events_helper.handler import (load_session, load_events,
-                                          import_module)
+                                          import_module, get_event_paths)
 
 DEBUG = False
-
-
-def get_events():
-    return [os.path.join(f, n).replace('\\', '/')
-            for f in EVENTS_ROOTS for n in os.listdir(f)
-            if n.endswith('.py') and not n.startswith('_')]
 
 
 def register_events():
@@ -26,9 +17,8 @@ def register_events():
         print('当前为Debug模式，只会处理DEBUG_USERS中的账号触发的事件...')
 
     tmp_models = []
-    for event_path in get_events():
-        model_obj = import_module(
-            os.path.basename(event_path).rsplit('.', 1)[0], event_path)
+    for event_path in get_event_paths():
+        model_obj = import_module(event_path)
 
         if hasattr(model_obj, 'DEBUG') and getattr(model_obj, 'DEBUG'):
             tmp_models.append((True, model_obj))

@@ -12,7 +12,8 @@ import ftrack_api
 
 from ftrack_events_helper.mongo import Mongo
 from ftrack_events_helper.config import (DB_INFO_CONFIG, FTRACK_USER_CONFIG,
-                                         FTRACK_DEBUG_USER_CONFIG, DEBUG_USERS)
+                                         FTRACK_DEBUG_USER_CONFIG, DEBUG_USERS,
+                                         EVENTS_ROOTS)
 
 
 def get_group_name(current_file, event_name):
@@ -48,7 +49,8 @@ def load_session(debug=False):
     return ftrack_api.Session(**FTRACK_USER_CONFIG, auto_connect_event_hub=True)
 
 
-def import_module(name, model_path):
+def import_module(model_path):
+    name = os.path.basename(model_path).rsplit('.', 1)[0]
     spec = importlib.util.spec_from_file_location(name, model_path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -57,18 +59,15 @@ def import_module(name, model_path):
 
 def get_event_func(file_path_or_module):
     if isinstance(file_path_or_module, str):
-        module_obj = import_module(
-            os.path.basename(file_path_or_module).rsplit('.', 1)[0],
-            file_path_or_module)
+        module_obj = import_module(file_path_or_module)
     else:
         module_obj = file_path_or_module
 
     funcs = []
     for func in [x for x in dir(module_obj) if not x.startswith('_')]:
         func_obj = getattr(module_obj, func)
-        if not hasattr(func_obj, 'topic'):
-            continue
-        funcs.append(func_obj)
+        if hasattr(func_obj, 'topic'):
+            funcs.append(func_obj)
 
     return funcs
 
@@ -112,3 +111,9 @@ def load_events(session, file_path_or_module, debug):
     for func in get_event_func(file_path_or_module):
         subscribe_event(func, session, debug)
         print('已成功添加事件：{}'.format(func.__name__))
+
+
+def get_event_paths():
+    return [os.path.join(f, n).replace('\\', '/')
+            for f in EVENTS_ROOTS for n in os.listdir(f)
+            if n.endswith('.py') and not n.startswith('_')]

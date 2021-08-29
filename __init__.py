@@ -9,9 +9,9 @@ import traceback
 from functools import wraps
 from datetime import datetime
 
-from mongo import Mongo
-from config import DB_LOG_CONFIG
-from handler import LogFormatter, get_group_name, load_session, load_events
+from .mongo import Mongo
+from .config import DB_LOG_CONFIG
+from .handler import LogFormatter, get_group_name, load_session, load_events
 
 
 def subscribe(topic='ftrack.update', subscriber=None, priority=100):
@@ -63,29 +63,24 @@ class Log(object):
 
     log_format = '{local_time} group:{group} event:{event} {type!u}:{msg}'
 
-    @classmethod
-    def error(cls, msg, **kwargs):
-        return cls._record(msg, 'error', **kwargs)
+    def error(self, msg, **kwargs):
+        return self._record(msg, 'error', **kwargs)
 
-    @classmethod
-    def exception(cls, msg, group=None, event=None, **kwargs):
-        return cls._record(msg, 'exception', group, event, **kwargs)
+    def exception(self, msg, group=None, event=None, **kwargs):
+        return self._record(msg, 'exception', group, event, **kwargs)
 
-    @classmethod
-    def info(cls, msg, **kwargs):
-        return cls._record(msg, 'info', **kwargs)
+    def info(self, msg, **kwargs):
+        return self._record(msg, 'info', **kwargs)
 
-    @classmethod
-    def warning(cls, msg, **kwargs):
-        return cls._record(msg, 'warning', **kwargs)
+    def warning(self, msg, **kwargs):
+        return self._record(msg, 'warning', **kwargs)
 
-    @classmethod
-    def _make_msg(cls, data):
-        return (cls._log_formatter.format(cls.log_format, **data) or
-                data['msg']) + u'\n'
+    def _make_msg(self, data):
+        return self._log_formatter.format(self.log_format, **data) or data[
+            "msg"]
 
-    @classmethod
-    def _record(cls, msg, log_type, group=None, event=None, info=None, **kwargs):
+    def _record(self, msg, log_type, group=None, event=None, info=None,
+                **kwargs):
         if not info:
             info = traceback.extract_stack()[-3]
 
@@ -95,7 +90,8 @@ class Log(object):
             data = {
                 'msg': msg.strip(),
                 'type': log_type,
-                'group': (group or get_group_name(info[0].replace('\\\\', '/'), event)),
+                'group': (group or
+                          get_group_name(info[0].replace('\\\\', '/'), event)),
                 'time': time,
                 'local_time': time.strftime('%Y/%m/%d %H:%M:%S'),
                 'event': event,
@@ -103,49 +99,52 @@ class Log(object):
             data.update(kwargs)
             db.add(data)
 
-        msg = cls._make_msg(data)
-        cls._set_cmd_text_color(log_type)
-        sys.stdout.write(msg)
-        cls._reset_cmd_color()
+        msg = self._make_msg(data)
+        self._set_cmd_text_color(log_type)
+        sys.stdout.write(f'{msg}\n')
+        self._reset_cmd_color()
 
         return msg
 
-    @classmethod
-    def log_color(cls, color_type):
-        return cls._log_color_by_type.get(color_type, ('black', 0x0f))[0]
+    def log_color(self, color_type):
+        return self._log_color_by_type.get(color_type, ('black', 0x0f))[0]
 
-    @classmethod
-    def _set_cmd_text_color(cls, color_type):
+    def _set_cmd_text_color(self, color_type):
         handle = ctypes.windll.kernel32.GetStdHandle(-11)
         if not isinstance(color_type, int):
-            color = cls._log_color_by_type.get(color_type, ('black', 0x0f))[1]
+            color = self._log_color_by_type.get(color_type, ('black', 0x0f))[1]
         else:
             color = color_type
         return ctypes.windll.kernel32.SetConsoleTextAttribute(handle, color)
 
-    @classmethod
-    def _reset_cmd_color(cls):
-        cls._set_cmd_text_color(0x0c | 0x0a | 0x09)
+    def _reset_cmd_color(self):
+        self._set_cmd_text_color(0x0c | 0x0a | 0x09)
 
 
-class EventBase(Log):
+logger = Log()
+
+
+class EventBase(object):
     """
         如果事件想写成类，可以继承这个类
         run函数为event的入口函数，需要在run函数处理事件
-        在类里面可以直接调用self.info/self.error/self.warning/self.exception来记录log
+        在类里面可以直接调用self.logger 拿到logger对象
     """
+    event_name = None  # 自定义事件名，如果不设置，就用类名
 
     def __init__(self, session):
         self.session = session
+        self.logger = Log()
+        self.logger._record = self._logger_record
 
     def run(self, event):
         raise NotImplementedError
 
-    @classmethod
-    def _record(cls, msg, log_type, group=None, event=None, **kwargs):
-        return super(EventBase, cls)._record(
-            msg, log_type, group, cls.__name__,
-            traceback.extract_stack()[-3], **kwargs
+    def _logger_record(self, msg, log_type, group=None, event=None, **kwargs):
+        event = self.event_name or self.__class__.__name__
+
+        return Log()._record(
+            msg, log_type, group, event, traceback.extract_stack()[-3], **kwargs
         )
 
 

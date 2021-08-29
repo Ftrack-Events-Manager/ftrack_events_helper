@@ -3,12 +3,16 @@
 @author: LiaoKong
 @time: 2021/08/28 20:42 
 """
+import os
 import string
+import importlib.util
+from functools import partial
 
 import ftrack_api
 
-from mongo import Mongo
-from config import DB_INFO_CONFIG, FTRACK_USER_CONFIG, FTRACK_DEBUG_USER_CONFIG
+from ftrack_events_helper.mongo import Mongo
+from ftrack_events_helper.config import (DB_INFO_CONFIG, FTRACK_USER_CONFIG,
+                                         FTRACK_DEBUG_USER_CONFIG, DEBUG_USERS)
 
 
 def get_group_name(current_file, event_name):
@@ -38,11 +42,73 @@ class LogFormatter(string.Formatter):
 
 def load_session(debug=False):
     if debug:
-        return ftrack_api.Session(**FTRACK_DEBUG_USER_CONFIG)
+        return ftrack_api.Session(**FTRACK_DEBUG_USER_CONFIG,
+                                  auto_connect_event_hub=True)
 
-    return ftrack_api.Session(**FTRACK_USER_CONFIG)
+    return ftrack_api.Session(**FTRACK_USER_CONFIG, auto_connect_event_hub=True)
+
+
+def import_module(name, model_path):
+    spec = importlib.util.spec_from_file_location(name, model_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def get_event_func(file_path_or_module):
+    if isinstance(file_path_or_module, str):
+        module_obj = import_module(
+            os.path.basename(file_path_or_module).rsplit('.', 1)[0],
+            file_path_or_module)
+    else:
+        module_obj = file_path_or_module
+
+    funcs = []
+    for func in [x for x in dir(module_obj) if not x.startswith('_')]:
+        func_obj = getattr(module_obj, func)
+        if not hasattr(func_obj, 'topic'):
+            continue
+        funcs.append(func_obj)
+
+    return funcs
+
+
+def func_obj_proxy(func_obj, session, is_class, debug, event):
+    is_debug_user = (event.get('data', {}).get('user', {}).get('name', '')
+                     in DEBUG_USERS)
+
+    if debug:
+        if not is_debug_user:
+            return
+    else:
+        if is_debug_user:
+            return
+
+    if is_class:
+        return func_obj(event)
+    else:
+        return func_obj(session, event)
+
+
+def subscribe_event(func_obj, session, debug):
+    if func_obj.is_class:
+        class_obj = func_obj(session)
+        run_func_obj = class_obj.run
+    else:
+        run_func_obj = func_obj
+
+    event_func = partial(func_obj_proxy, run_func_obj, session,
+                         func_obj.is_class, debug)
+
+    return session.event_hub.subscribe(
+        'topic=' + func_obj.topic,
+        event_func,
+        func_obj.subscriber,
+        func_obj.priority
+    )
 
 
 def load_events(session, file_path_or_module, debug):
-    # todo 实现这个
-    pass
+    for func in get_event_func(file_path_or_module):
+        subscribe_event(func, session, debug)
+        print('已成功添加事件：{}'.format(func.__name__))

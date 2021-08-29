@@ -5,7 +5,7 @@
 """
 import pymongo
 
-from config import DB_CONFIG
+from ftrack_events_helper.config import DB_CONFIG
 
 
 class Mongo(object):

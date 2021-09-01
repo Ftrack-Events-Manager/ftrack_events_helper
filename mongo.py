@@ -26,14 +26,14 @@ class Mongo(object):
             data = [data]
         return self.collection.insert_many(data)
 
-    def update(self, data, query_filter, upsert=False, update_one=False):
-        if update_one:
-            return self.collection.update_one(query_filter, data, upsert)
-        return self.collection.update_many(query_filter, data, upsert)
+    def update(self, data, query_filter, upsert=False, multi=True):
+        return self.collection.update(query_filter, {'$set': data}, upsert,
+                                      multi=multi)
 
     def delete(self, query_filter):
         if not query_filter:
-            raise ValueError('Query_filter is empty, please user drop_collection delete collection.')
+            raise ValueError(
+                'Query_filter is empty, please user drop_collection delete collection.')
         self.collection.delete_many(query_filter)
 
     def drop_collection(self):

@@ -5,6 +5,7 @@
 """
 import sys
 import ctypes
+import json
 import traceback
 from functools import wraps
 from datetime import datetime
@@ -39,7 +40,7 @@ def subscribe(topic='ftrack.update', subscriber=None, priority=100):
                     file_path = func.__globals__['__file__']
                 group = get_group_name(file_path, func.__name__)
                 Log.exception(traceback.format_exc(), group, func.__name__,
-                              variables=str(args[-1].items()),
+                              variables=json.dumps(args[-1]),
                               pathname=file_path)
 
         inner.topic = topic

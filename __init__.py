@@ -76,7 +76,7 @@ class Log(object):
     def warning(self, msg, **kwargs):
         return self._record(msg, 'warning', **kwargs)
 
-    def _make_msg(self, data):
+    def make_msg(self, data):
         return self._log_formatter.format(self.log_format, **data) or data[
             "msg"]
 
@@ -100,7 +100,7 @@ class Log(object):
             data.update(kwargs)
             db.add(data)
 
-        msg = self._make_msg(data)
+        msg = self.make_msg(data)
         self._set_cmd_text_color(log_type)
         sys.stdout.write(f'{msg}\n')
         self._reset_cmd_color()
